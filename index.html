@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تتبع الشحنات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-950:#0b1420;
+    --navy-900:#101d2e;
+    --navy-800:#16283f;
+    --navy-700:#1f3653;
+    --line:#28405f;
+    --text:#eaf0f6;
+    --muted:#8ea0b8;
+    --amber:#e8a33d;
+    --amber-dim:#c98a2d;
+    --green:#4caf7d;
+    --red:#e2664f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--navy-950);
+    color:var(--text);
+    font-family:"IBM Plex Sans Arabic", sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+  .wrap{
+    max-width:520px;
+    margin:0 auto;
+    padding:48px 20px 32px;
+    width:100%;
+    flex:1;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .brand .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--amber);
+    display:inline-block;
+  }
+  h1{
+    font-size:26px;
+    font-weight:700;
+    margin:0 0 6px;
+  }
+  .sub{
+    color:var(--muted);
+    font-size:14.5px;
+    margin:0 0 32px;
+    line-height:1.7;
+  }
+  .search-box{
+    background:var(--navy-900);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:8px;
+    display:flex;
+    gap:8px;
+  }
+  input#userInput{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-family:"Roboto Mono", monospace;
+    font-size:16px;
+    padding:14px 12px;
+    letter-spacing:0.5px;
+  }
+  input#userInput::placeholder{
+    font-family:"IBM Plex Sans Arabic", sans-serif;
+    color:var(--muted);
+    letter-spacing:0;
+  }
+  button#searchBtn{
+    background:var(--amber);
+    color:var(--navy-950);
+    border:none;
+    border-radius:9px;
+    padding:0 22px;
+    font-family:"IBM Plex Sans Arabic", sans-serif;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  button#searchBtn:hover{background:var(--amber-dim);}
+  button#searchBtn:active{transform:scale(0.98);}
+
+  #result{
+    margin-top:24px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .card{
+    background:var(--navy-900);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:14px;
+    animation:rise .25s ease;
+  }
+  @keyframes rise{
+    from{opacity:0; transform:translateY(6px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  .card .track-no{
+    font-family:"Roboto Mono", monospace;
+    font-size:15px;
+    color:var(--text);
+    word-break:break-all;
+  }
+  .card .track-label{
+    color:var(--muted);
+    font-size:11.5px;
+    margin-bottom:4px;
+  }
+  .weight-pill{
+    flex-shrink:0;
+    background:rgba(232,163,61,.15);
+    color:var(--amber);
+    padding:8px 16px;
+    border-radius:100px;
+    font-size:14px;
+    font-weight:700;
+    font-family:"Roboto Mono", monospace;
+    white-space:nowrap;
+  }
+
+  .summary{
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:2px;
+  }
+
+  .not-found{
+    text-align:center;
+    padding:36px 12px;
+    color:var(--muted);
+    font-size:14.5px;
+    line-height:1.8;
+  }
+  .not-found .big{
+    font-size:34px;
+    margin-bottom:10px;
+  }
+  footer{
+    text-align:center;
+    padding:20px;
+    color:var(--navy-700);
+    font-size:12.5px;
+  }
+  @media (max-width:400px){
+    .wrap{padding-top:36px;}
+    h1{font-size:22px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="brand"><span class="dot"></span><span style="color:var(--muted); font-size:13px;">تتبع الشحنات</span></div>
+  <h1>عندك شحنة بالطريق؟</h1>
+  <p class="sub">أدخل اليوزر (اسم المستخدم) الخاص فيك، وراح نطلعلك كل شحناتك المسجلة.</p>
+
+  <div class="search-box">
+    <input id="userInput" type="text" placeholder="اليوزر، مثال: ahmed_kareem" inputmode="text" autocomplete="off">
+    <button id="searchBtn">بحث</button>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<footer>البيانات تُحدَّث يدويًا من قبل الإدارة</footer>
+
+<script>
+let DB = [];
+
+async function loadData(){
+  try{
+    const res = await fetch('data.json?_=' + Date.now());
+    if(!res.ok) throw new Error('no data');
+    DB = await res.json();
+    if(!Array.isArray(DB)) DB = [];
+  }catch(e){
+    DB = [];
+  }
+}
+
+function normalize(s){
+  return String(s).trim().toLowerCase().replace(/\s+/g,'');
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function render(items){
+  const resultEl = document.getElementById('result');
+  if(!items || items.length === 0){
+    resultEl.innerHTML = `
+      <div class="not-found">
+        <div class="big">📦</div>
+        <div>ما لكينا شحنات مسجلة بهذا اليوزر.</div>
+        <div>تأكد من كتابة اليوزر صحيح، أو تواصل مع الدعم.</div>
+      </div>`;
+    return;
+  }
+  const summary = `<div class="summary">لكينا ${items.length} ${items.length === 1 ? 'شحنة' : 'شحنات'}</div>`;
+  const cards = items.map(item => `
+    <div class="card">
+      <div>
+        <div class="track-label">رقم التتبع</div>
+        <div class="track-no">${escapeHtml(item.tracking_number)}</div>
+      </div>
+      <div class="weight-pill">${escapeHtml(item.weight || '—')} كغم</div>
+    </div>
+  `).join('');
+  resultEl.innerHTML = summary + cards;
+}
+
+async function doSearch(){
+  const q = document.getElementById('userInput').value;
+  if(!q.trim()){
+    document.getElementById('result').innerHTML = '';
+    return;
+  }
+  if(DB.length === 0){
+    await loadData();
+  }
+  const target = normalize(q);
+  const matches = DB.filter(item => normalize(item.username || '') === target);
+  render(matches);
+}
+
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('userInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') doSearch();
+});
+
+loadData();
+</script>
+
+</body>
+</html>

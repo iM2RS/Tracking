@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة التحكم — تتبع الشحنات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy-950:#0b1420;
+    --navy-900:#101d2e;
+    --navy-800:#16283f;
+    --line:#28405f;
+    --text:#eaf0f6;
+    --muted:#8ea0b8;
+    --amber:#e8a33d;
+    --amber-dim:#c98a2d;
+    --green:#4caf7d;
+    --red:#e2664f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--navy-950);
+    color:var(--text);
+    font-family:"IBM Plex Sans Arabic", sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:36px 18px 60px;}
+  h1{font-size:22px; margin:0 0 4px;}
+  .sub{color:var(--muted); font-size:13.5px; margin:0 0 28px;}
+
+  /* Login */
+  #loginBox{
+    background:var(--navy-900);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px;
+    max-width:360px;
+    margin:60px auto;
+  }
+  #loginBox h2{font-size:17px; margin:0 0 16px;}
+  #loginBox input{
+    width:100%;
+    background:var(--navy-950);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:12px;
+    color:var(--text);
+    font-size:15px;
+    margin-bottom:12px;
+    outline:none;
+  }
+  #loginBox button, .btn{
+    background:var(--amber);
+    color:var(--navy-950);
+    border:none;
+    border-radius:9px;
+    padding:12px 18px;
+    font-family:inherit;
+    font-weight:700;
+    font-size:14.5px;
+    cursor:pointer;
+    width:100%;
+  }
+  .btn.secondary{
+    background:var(--navy-800);
+    color:var(--text);
+    border:1px solid var(--line);
+  }
+  #loginErr{color:var(--red); font-size:13px; margin-top:8px; display:none;}
+
+  /* Panel */
+  #panel{display:none;}
+  .section{
+    background:var(--navy-900);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:18px;
+  }
+  .section h2{font-size:15.5px; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+  .section h2 .n{
+    background:var(--navy-800); color:var(--amber);
+    width:22px; height:22px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:12px; font-family:"Roboto Mono", monospace;
+  }
+  label{display:block; font-size:13px; color:var(--muted); margin:10px 0 5px;}
+  input[type=text]{
+    width:100%;
+    background:var(--navy-950);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:11px;
+    color:var(--text);
+    font-family:inherit;
+    font-size:14.5px;
+    outline:none;
+  }
+  input[type=file]{
+    width:100%;
+    color:var(--muted);
+    font-size:13px;
+    padding:10px 0;
+  }
+  .row2{display:flex; gap:10px;}
+  .row2 > div{flex:1;}
+  .actions{display:flex; gap:10px; margin-top:16px;}
+  .actions .btn{width:auto; flex:1;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px; margin-top:6px;}
+  th{
+    text-align:right; color:var(--muted); font-weight:500;
+    font-size:12px; padding:8px 6px; border-bottom:1px solid var(--line);
+  }
+  td{padding:9px 6px; border-bottom:1px solid var(--navy-800); vertical-align:top;}
+  td.mono{font-family:"Roboto Mono", monospace; font-size:12.5px; word-break:break-all;}
+  .del-btn{
+    background:none; border:none; color:var(--red);
+    cursor:pointer; font-size:16px; padding:2px 6px;
+  }
+  .empty-row{color:var(--muted); text-align:center; padding:20px 0; font-size:13.5px;}
+  .count-badge{color:var(--muted); font-size:12.5px; font-weight:400;}
+  .hint{color:var(--muted); font-size:12.5px; line-height:1.8; margin-top:10px;}
+  .status-msg{
+    font-size:13px; margin-top:10px; padding:10px 12px;
+    border-radius:8px; display:none;
+  }
+  .status-msg.ok{background:rgba(76,175,125,.15); color:var(--green); display:block;}
+  .status-msg.err{background:rgba(226,102,79,.15); color:var(--red); display:block;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div id="loginBox">
+    <h2>دخول الإدارة</h2>
+    <input type="text" id="pwInput" placeholder="كلمة المرور">
+    <button onclick="tryLogin()">دخول</button>
+    <div id="loginErr">كلمة المرور غير صحيحة</div>
+  </div>
+
+  <div id="panel">
+    <h1>لوحة التحكم</h1>
+    <p class="sub">أضف الشحنات، ثم صدّر ملف data.json وارفعه للمستودع.</p>
+
+    <div class="section">
+      <h2><span class="n">1</span> إضافة شحنة يدويًا</h2>
+      <label>رقم التتبع *</label>
+      <input type="text" id="f_tracking" placeholder="TRK-10234">
+      <div class="row2">
+        <div>
+          <label>اليوزر *</label>
+          <input type="text" id="f_username" placeholder="ahmed_kareem">
+        </div>
+        <div>
+          <label>الوزن (كغم) *</label>
+          <input type="text" id="f_weight" placeholder="2.5">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="addManual()">إضافة</button>
+      </div>
+      <div id="manualMsg" class="status-msg"></div>
+    </div>
+
+    <div class="section">
+      <h2><span class="n">2</span> استيراد دفعة من Excel / CSV</h2>
+      <p class="hint">
+        الأعمدة المتوقعة بالملف: <b>tracking_number</b>, <b>username</b>, <b>weight</b> (أول صف = أسماء الأعمدة). كل صف = شحنة وحدة، ونفس اليوزر ممكن يتكرر لأكثر من شحنة.
+        <br>ملفات Word غير مدعومة مباشرة — حوّل الجدول لِـ Excel أولًا.
+      </p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <div id="importMsg" class="status-msg"></div>
+    </div>
+
+    <div class="section">
+      <h2><span class="n">3</span> الشحنات الحالية <span class="count-badge" id="countBadge"></span></h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>رقم التتبع</th><th>اليوزر</th><th>الوزن</th><th></th></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty-row" style="display:none;">لا توجد شحنات بعد</div>
+    </div>
+
+    <div class="section">
+      <h2><span class="n">4</span> تصدير ورفع للمستودع</h2>
+      <p class="hint">اضغط تنزيل، ثم ارفع الملف الناتج (data.json) لمستودع GitHub ليحل محل الملف القديم — من صفحة المستودع اضغط Add file → Upload files.</p>
+      <div class="actions">
+        <button class="btn" onclick="exportData()">تنزيل data.json</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const ADMIN_PASSWORD = "change-me-1234";
+let records = [];
+
+function tryLogin(){
+  const val = document.getElementById('pwInput').value;
+  if(val === ADMIN_PASSWORD){
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('panel').style.display = 'block';
+    loadExisting();
+  } else {
+    document.getElementById('loginErr').style.display = 'block';
+  }
+}
+document.getElementById('pwInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') tryLogin();
+});
+
+async function loadExisting(){
+  try{
+    const res = await fetch('data.json?_=' + Date.now());
+    if(res.ok){
+      records = await res.json();
+      if(!Array.isArray(records)) records = [];
+    }
+  }catch(e){
+    records = [];
+  }
+  renderTable();
+}
+
+function renderTable(){
+  const body = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+  document.getElementById('countBadge').textContent = records.length ? `(${records.length})` : '';
+  if(records.length === 0){
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  body.innerHTML = records.map((r, i) => `
+    <tr>
+      <td class="mono">${escapeHtml(r.tracking_number || '')}</td>
+      <td>${escapeHtml(r.username || '')}</td>
+      <td>${escapeHtml(r.weight || '')}</td>
+      <td><button class="del-btn" onclick="removeRow(${i})" title="حذف">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function removeRow(i){
+  records.splice(i, 1);
+  renderTable();
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function upsert(item){
+  // Tracking number is unique per shipment; a username can have several shipments.
+  const idx = records.findIndex(r => (r.tracking_number || '').trim().toLowerCase() === (item.tracking_number || '').trim().toLowerCase());
+  if(idx >= 0){
+    records[idx] = {...records[idx], ...item};
+  } else {
+    records.push(item);
+  }
+}
+
+function addManual(){
+  const tracking = document.getElementById('f_tracking').value.trim();
+  const username = document.getElementById('f_username').value.trim();
+  const weight = document.getElementById('f_weight').value.trim();
+  const msg = document.getElementById('manualMsg');
+  if(!tracking || !username){
+    msg.textContent = 'رقم التتبع واليوزر مطلوبين';
+    msg.className = 'status-msg err';
+    return;
+  }
+  upsert({
+    tracking_number: tracking,
+    username: username,
+    weight: weight
+  });
+  ['f_tracking','f_username','f_weight'].forEach(id => document.getElementById(id).value = '');
+  msg.textContent = 'تمت الإضافة';
+  msg.className = 'status-msg ok';
+  renderTable();
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const msg = document.getElementById('importMsg');
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const wb = XLSX.read(evt.target.result, {type:'binary'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      let count = 0;
+      rows.forEach(row => {
+        const norm = {};
+        Object.keys(row).forEach(k => norm[k.trim().toLowerCase()] = row[k]);
+        if(!norm.tracking_number || !norm.username) return;
+        upsert({
+          tracking_number: String(norm.tracking_number).trim(),
+          username: String(norm.username).trim(),
+          weight: String(norm.weight || '').trim()
+        });
+        count++;
+      });
+      renderTable();
+      msg.textContent = `تم استيراد ${count} سجل بنجاح`;
+      msg.className = 'status-msg ok';
+    }catch(err){
+      msg.textContent = 'تعذّرت قراءة الملف — تأكد من الصيغة';
+      msg.className = 'status-msg err';
+    }
+  };
+  reader.readAsBinaryString(file);
+});
+
+function exportData(){
+  const blob = new Blob([JSON.stringify(records, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'data.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>
